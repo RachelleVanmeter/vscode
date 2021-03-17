@@ -1032,7 +1032,8 @@ class NotebookCellExecutionTask extends Disposable {
 
 		this.mixinMetadata({
 			runState: NotebookCellExecutionState.Pending,
-			lastRunDuration: null
+			lastRunDuration: null,
+			executionOrder: null
 		});
 	}
 
