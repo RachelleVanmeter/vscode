@@ -23,8 +23,8 @@ class NotebookEditorCellEditBuilder implements vscode.NotebookEditorEdit {
 	private _finalized: boolean = false;
 	private _collectedEdits: ICellEditOperation[] = [];
 
-	constructor(documentVersionId: number) {
-		this._documentVersionId = documentVersionId;
+	constructor(private readonly _document: ExtHostNotebookDocument) {
+		this._documentVersionId = this._document.notebookDocument.version;
 	}
 
 	finalize(): INotebookEditData {
@@ -51,18 +51,28 @@ class NotebookEditorCellEditBuilder implements vscode.NotebookEditorEdit {
 
 	replaceCellMetadata(index: number, metadata: vscode.NotebookCellMetadata): void {
 		this._throwIfFinalized();
+		const cell = this._document.getCellFromIndex(index);
+		if (!cell) {
+			return;
+		}
+
 		this._collectedEdits.push({
 			editType: CellEditType.PartialMetadata,
-			index,
+			handle: cell.handle,
 			metadata
 		});
 	}
 
 	replaceCellOutput(index: number, outputs: vscode.NotebookCellOutput[]): void {
 		this._throwIfFinalized();
+		const cell = this._document.getCellFromIndex(index);
+		if (!cell) {
+			return;
+		}
+
 		this._collectedEdits.push({
 			editType: CellEditType.Output,
-			index,
+			handle: cell.handle,
 			outputs: outputs.map(output => {
 				return extHostConverter.NotebookCellOutput.from(output);
 			})
@@ -149,7 +159,7 @@ export class ExtHostNotebookEditor {
 					return that.onDidDispose;
 				},
 				edit(callback) {
-					const edit = new NotebookEditorCellEditBuilder(this.document.version);
+					const edit = new NotebookEditorCellEditBuilder(that.notebookData);
 					callback(edit);
 					return that._applyEdit(edit.finalize());
 				},
@@ -206,7 +216,7 @@ export class ExtHostNotebookEditor {
 
 			if (prev.editType === CellEditType.Replace && editData.cellEdits[i].editType === CellEditType.Replace) {
 				const edit = editData.cellEdits[i];
-				if ((edit.editType !== CellEditType.DocumentMetadata) && prev.index === edit.index) {
+				if ((edit.editType !== CellEditType.DocumentMetadata) && prev.index === -1) { // TODO@roblou
 					prev.cells.push(...(editData.cellEdits[i] as ICellReplaceEdit).cells);
 					prev.count += (editData.cellEdits[i] as ICellReplaceEdit).count;
 					continue;
